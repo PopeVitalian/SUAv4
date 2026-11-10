@@ -31,8 +31,8 @@ def op_states(service):
 def op_set_state(service):
     serial = input("  Serijska številka naprave: ").strip()
     state = input("  Novo stanje (ON/OFF): ").strip().upper()
-    device = service.set_device_state(serial, state)
-    print("  OK: " + device["serial"] + " -> " + str(device["state"]))
+    service.set_device_state(serial, state)
+    print("  OK: " + serial + " -> " + state)
 
 
 def op_sensors(service):

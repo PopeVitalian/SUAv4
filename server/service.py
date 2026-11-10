@@ -46,7 +46,7 @@ class ServerRoomService(ServiceBase):
             devices.append(to_device(record))
         return devices
 
-    @rpc(Unicode, Unicode, _returns=Device)
+    @rpc(Unicode, Unicode, _returns=None)
     def set_device_state(ctx, serial, state):
         if state not in ("ON", "OFF"):
             raise Fault(faultcode="Client", faultstring="invalid state: " + state)
@@ -107,7 +107,7 @@ class ServerRoomService(ServiceBase):
             sensor["value"] = str(outlet_index)
         return to_device(record)
 
-    @rpc(Unicode, Double, _returns=Device)
+    @rpc(Unicode, Double, _returns=None)
     def set_alarm_temp(ctx, serial, temp_c):
         if temp_c <= 0 or temp_c > 100:
             raise Fault(faultcode="Client", faultstring="temp_c must be in (0, 100]")
