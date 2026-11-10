@@ -117,16 +117,21 @@ koristi za oceno. Polje `unit` na senzorju pove odjemalcu, kako
 vrednost interpretirati.
 
 **Kaj pa avtentikacija?**
-Ni implementirana. Naloga omenja "varen dostop" v kontekstu vmesnega
-sloja, ne zahteva pa avtentikacije. V produkciji bi storitev stala za
-avtentikacijskim prehodom (mTLS, API ključ ali OAuth proxy). Vezava
-na `127.0.0.1` je razvojna privzetska vrednost — nikoli je ne
-izpostavite javnemu omrežju takšne, kot je.
+Implementirana je prek WS-Security slogovne glave SOAP
+(`server/security/headers.py`): vsak klic nosi glavo `Security` z
+`UsernameToken` (uporabniško ime + geslo v odprtem besedilu — prek
+TLS v produkciji). Uporabniki so registrirani prek operacije
+`register_user` in shranjeni v `users.json` (gesla samo kot
+PBKDF2-SHA256 hash s soljo; datoteka je v `.gitignore`). Vsaka
+operacija preverja vlogo: `reader` sme brati, `writer` sme tudi
+pisati stanje naprav. Neveljavne poverilnice ali premajhna vloga
+sprožijo SOAP napako. Vezava na `127.0.0.1` je razvojna privzetska
+vrednost — nikoli je ne izpostavite javnemu omrežju takšne, kot je.
 
-**Kaj potem pomeni "varen dostop" brez avtentikacije?**
+**Kaj potem pomeni "varen dostop" prek vmesnega sloja?**
 Da se odjemalec nikoli ne dotakne naprav neposredno. Ves dostop gre
-skozi storitveni sloj, ki preveri vhod in ob neveljavnih zahtevah
-sproži SOAP napako. To je šiv, kamor bi dodali avtentikacijo.
+skozi storitveni sloj, ki preveri vhod (WS-Security glava) in ob
+neveljavnih zahtevah sproži SOAP napako.
 
 **Časovne značke in enote.**
 Vse časovne značke se ustvarijo z `datetime.now(timezone.utc)` —
