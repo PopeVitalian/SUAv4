@@ -133,6 +133,13 @@ Da se odjemalec nikoli ne dotakne naprav neposredno. Ves dostop gre
 skozi storitveni sloj, ki preveri vhod (WS-Security glava) in ob
 neveljavnih zahtevah sproži SOAP napako.
 
+**Beleženje dogodkov na strežniški strani.**
+`run_server.py` enkrat nastavi stdlib `logging` (konzola + datoteka
+`server.log`, ki je v `.gitignore`). Vsaka operacija v
+`server/service.py` beleži en `log.info` (klicatelj iz WS-Security
+glave, operacija, argumenti — gesla ne beležimo), ob neuspeli
+avtentikaciji pa `_require_role` beleži `log.warning`.
+
 **Časovne značke in enote.**
 Vse časovne značke se ustvarijo z `datetime.now(timezone.utc)` —
 časovno občutljive, na žici v ISO 8601. Pomembno zato, ker naloga
