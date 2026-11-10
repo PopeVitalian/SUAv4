@@ -9,7 +9,6 @@ DEVICES: dict[str, dict] = {
         "sensors": [
             {"serial": "PDU-2026-0001-current", "name": "Total current draw", "unit": "A"},
             {"serial": "PDU-2026-0001-temp", "name": "Rack intake temperature", "unit": "C"},
-            {"serial": "PDU-2026-0001-outlet", "name": "Rack plugged outlet", "unit": "1-8", "value": "1"},
         ],
     },
     "ENV-2026-0001": {
@@ -20,7 +19,6 @@ DEVICES: dict[str, dict] = {
         "sensors": [
             {"serial": "ENV-2026-0001-temperature", "name": "Temperature", "unit": "C"},
             {"serial": "ENV-2026-0001-door", "name": "Door contact", "unit": "enum"},
-            {"serial": "ENV-2026-0001-alarm", "name": "Alarm temperature", "unit": "C", "value": "30.0"},
         ],
     },
     "CAM-2026-0001": {
@@ -30,7 +28,6 @@ DEVICES: dict[str, dict] = {
         "state": "ON",
         "sensors": [
             {"serial": "CAM-2026-0001-motion", "name": "Motion detected", "unit": "bool"},
-            {"serial": "CAM-2026-0001-position", "name": "Camera position", "unit": "door/aisle-a/rack-3", "value": "door"},
         ],
     },
 }
@@ -66,13 +63,6 @@ def simulate_reading(sensor_serial: str) -> str:
             return "true"
 
     raise KeyError("unknown sensor: " + sensor_serial)
-
-
-def read_sensor_value(sensor: dict) -> str:
-    
-    if "value" in sensor:
-        return sensor["value"]
-    return simulate_reading(sensor["serial"])
 
 
 # vrne serijsko številko naprave

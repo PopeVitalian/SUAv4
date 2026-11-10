@@ -15,9 +15,6 @@ def print_menu():
     print("2) Nastavi stanje naprave (ON/OFF)")
     print("3) Prikaži senzorje naprave")
     print("4) Prikaži meritve naprave")
-    print("5) Preklopi vtičnico PDU (1-8)")
-    print("6) Nastavi alarmno temperaturo ENV")
-    print("7) Nastavi PTZ pozicijo CAM")
     print("0) Izhod")
 
 
@@ -51,29 +48,6 @@ def op_readings(service):
         print("    - " + reading["sensor_serial"] + " @ " + str(reading["timestamp"]) + " -> " + str(reading["value"]))
 
 
-def op_toggle_outlet(service):
-    serial = input("  Serijska številka PDU (npr. PDU-2026-0001): ").strip()
-    index_str = input("  Indeks vtičnice (1-8): ").strip()
-    index = int(index_str)
-    device = service.toggle_outlet(serial, index)
-    print("  OK: preklopljena vtičnica " + str(index) + " na " + device["serial"])
-
-
-def op_set_alarm(service):
-    serial = input("  Serijska številka ENV (npr. ENV-2026-0001): ").strip()
-    temp_str = input("  Alarmna temperatura v C: ").strip()
-    temp = float(temp_str)
-    device = service.set_alarm_temp(serial, temp)
-    print("  OK: alarm nastavljen na " + device["serial"])
-
-
-def op_goto_preset(service):
-    serial = input("  Serijska številka CAM (npr. CAM-2026-0001): ").strip()
-    preset = input("  Pozicija (door / aisle-a / rack-3): ").strip()
-    device = service.goto_preset(serial, preset)
-    print("  OK: pozicija nastavljena na " + device["serial"])
-
-
 def main():
     print("Povezujem se na " + WSDL + " ...")
     try:
@@ -91,9 +65,6 @@ def main():
         "2": op_set_state,
         "3": op_sensors,
         "4": op_readings,
-        "5": op_toggle_outlet,
-        "6": op_set_alarm,
-        "7": op_goto_preset,
     }
 
     while True:

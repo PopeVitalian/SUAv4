@@ -53,18 +53,11 @@ in boolean tip.
 | `set_device_state(serial, st)`   | Nastavi napravo na ON ali OFF                  |
 | `get_sensors(serial)`            | Vrne senzorje ene naprave                      |
 | `get_readings(serial)`           | Vrne eno svežo meritev na senzor               |
-| `toggle_outlet(serial, index)`   | Preklopi eno vtičnico PDU (indeks 1..8)        |
-| `set_alarm_temp(serial, temp)`   | Nastavi alarmno temperaturo ENV (v C)          |
-| `goto_preset(serial, preset)`    | Premakne CAM na PTZ pozicijo                   |
 
 Naloga zahteva štiri kategorije: branje stanja, pisanje stanja,
 krmiljenje, seznam senzorjev. Branje stanja, pisanje stanja in seznam
-senzorjev se preslikajo 1:1. **Krmiljenje je razdeljeno na tri ločene
-tipizirane operacije**, namesto ene netipizirane
-`executeCommand(vrsta, argumenti)`. Razlog: vsako krmiljenje ima svoje
-naravne parametre (indeks vtičnice, temperaturo, ime pozicije), ločene
-operacije pa ohranijo WSDL ekspliciten in samoopisen. Zeep vsako
-izpostavi kot samostojno metodo.
+senzorjev se preslikajo 1:1 na ločene operacije, ki ohranijo WSDL
+ekspliciten in samoopisen. Zeep vsako izpostavi kot samostojno metodo.
 
 `get_readings` ni v štirih zahtevanih kategorijah, a naloga zahteva,
 da so vrednosti senzorjev del sporočil. Obstaja zato, da odjemalec
@@ -99,18 +92,14 @@ Odjemalec ponudi meni z naslednjimi možnostmi:
    (ON/OFF). Primer: `PDU-2026-0001`, `OFF`.
 3. Prikaži senzorje naprave — seznam senzorjev za izbrano napravo.
 4. Prikaži meritve naprave — sveže meritve z časovnimi značkami UTC.
-5. Preklopi vtičnico PDU — primer: `PDU-2026-0001`, `3`.
-6. Nastavi alarmno temperaturo ENV — primer: `ENV-2026-0001`, `27.5`.
-7. Nastavi PTZ pozicijo CAM — primer: `CAM-2026-0001`, `door`.
 0. Izhod.
 
 Če pošljete neveljavne podatke (neobstoječa naprava, neveljavno
-stanje, napačna vrsta naprave za določeno krmiljenje), strežnik vrne
+stanje), strežnik vrne
 SOAP napako, odjemalec pa jo izpiše. Primer:
 
 - `get_sensors("XX-0000")` → `SOAP napaka: unknown device: XX-0000`
 - `set_device_state("PDU-2026-0001", "BROKEN")` → `SOAP napaka: invalid state: BROKEN`
-- `goto_preset("PDU-2026-0001", "door")` → `SOAP napaka: PDU-2026-0001 has no PTZ presets`
 
 ## Zasnova in odločitve (za zagovor)
 
@@ -126,9 +115,6 @@ v niz ohrani en sam tip sporočila za vse meritve in se izogne
 polimorfnim SOAP shemam, kar bi bilo precejšnje dodatno delo brez
 koristi za oceno. Polje `unit` na senzorju pove odjemalcu, kako
 vrednost interpretirati.
-
-**Zakaj tri ločene operacije za krmiljenje?**
-Glej zgoraj. To je zavestna odločitev, ne spregled.
 
 **Kaj pa avtentikacija?**
 Ni implementirana. Naloga omenja "varen dostop" v kontekstu vmesnega
