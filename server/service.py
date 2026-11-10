@@ -47,7 +47,7 @@ class ServerRoomService(ServiceBase):
         except KeyError:
             raise Fault(faultcode="Client", faultstring="unknown device: " + serial)
         record["state"] = state
-        return to_device(record)
+        return None
 
     @rpc(Unicode, _returns=Array(Sensor))
     def get_sensors(ctx, serial):
