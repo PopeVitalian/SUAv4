@@ -55,9 +55,16 @@ in boolean tip.
 | `get_readings(serial)`           | Vrne eno svežo meritev na senzor               |
 
 Naloga zahteva štiri kategorije: branje stanja, pisanje stanja,
-krmiljenje, seznam senzorjev. Branje stanja, pisanje stanja in seznam
-senzorjev se preslikajo 1:1 na ločene operacije, ki ohranijo WSDL
-ekspliciten in samoopisen. Zeep vsako izpostavi kot samostojno metodo.
+krmiljenje, seznam senzorjev. Kontrolne operacije iz naloge 3
+(PDU/ENV/CAM) so bile namerno umaknjene; spremembo stanja naprav
+pokriva `set_device_state`, branje stanja in seznam senzorjev pa se
+preslikata 1:1 na ločene operacije, ki ohranijo WSDL ekspliciten in
+samoopisen. Zeep vsako izpostavi kot samostojno metodo.
+
+`set_device_state` je implementirana skladno z vzorcem enosmerne
+komunikacije (one-way / fire-and-forget): operacija ne vrača podatkov
+(odzivno sporočilo v WSDL je prazno), zato odjemalec izpiše zahtevani
+ukaz, ne pa potrditve strežnika.
 
 `get_readings` ni v štirih zahtevanih kategorijah, a naloga zahteva,
 da so vrednosti senzorjev del sporočil. Obstaja zato, da odjemalec
@@ -65,7 +72,7 @@ lahko vidi dejansko vrednost.
 
 ## Namestitev
 
-Zahteva Python 3.10 do 3.12.
+Razvito in preizkušeno na Python 3.11.
 
     pip install -r requirements.txt
 
@@ -92,11 +99,17 @@ Odjemalec ponudi meni z naslednjimi možnostmi:
    (ON/OFF). Primer: `PDU-2026-0001`, `OFF`.
 3. Prikaži senzorje naprave — seznam senzorjev za izbrano napravo.
 4. Prikaži meritve naprave — sveže meritve z časovnimi značkami UTC.
+5. Registriraj novega uporabnika — operacija `register_user`.
+6. Prijava — nastavi WS-Security poverilnice za naslednje klice.
+7. Demo klici — prežene vse operacije enkrat in namerno sproži dve
+   napaki (zasedeno uporabniško ime, neveljavno stanje).
 0. Izhod.
 
 Če pošljete neveljavne podatke (neobstoječa naprava, neveljavno
-stanje), strežnik vrne
-SOAP napako, odjemalec pa jo izpiše. Primer:
+stanje, napačne poverilnice), strežnik vrne
+SOAP napako, odjemalec pa jo izpiše. Vse napake klicatelja uporabljajo
+`faultcode="Client"` (dogovor: Client = napačen vhod, Server = notranja
+napaka). Primer:
 
 - `get_sensors("XX-0000")` → `SOAP napaka: unknown device: XX-0000`
 - `set_device_state("PDU-2026-0001", "BROKEN")` → `SOAP napaka: invalid state: BROKEN`
@@ -120,7 +133,12 @@ vrednost interpretirati.
 Implementirana je prek WS-Security slogovne glave SOAP
 (`server/security/headers.py`): vsak klic nosi glavo `Security` z
 `UsernameToken` (uporabniško ime + geslo v odprtem besedilu — prek
-TLS v produkciji). Uporabniki so registrirani prek operacije
+TLS v produkciji). Glava je v imenskem prostoru storitve
+(`serverroom.soap`) namesto OASIS WSSE, ker Spyne z glavo v tujem
+imenskem prostoru generira nerešljivo referenco na `wsdl:message`
+([arskom/spyne#419](https://github.com/arskom/spyne/issues/419));
+dodan `resolve_namespace` v `headers.py` to zaobide, struktura glave
+pa ostane zvesta profilu UsernameToken. Uporabniki so registrirani prek operacije
 `register_user` in shranjeni v `users.json` (gesla samo kot
 PBKDF2-SHA256 hash s soljo; datoteka je v `.gitignore`). Vsaka
 operacija preverja vlogo: `reader` sme brati, `writer` sme tudi
