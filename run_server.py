@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
 # poženi server
 
+import logging
+
 from wsgiref.simple_server import make_server
 
 from server.app import wsgi_app
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler("server.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+log = logging.getLogger("serverroom")
 
 
 HOST = "127.0.0.1"
