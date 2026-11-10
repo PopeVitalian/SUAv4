@@ -6,46 +6,92 @@ from zeep.exceptions import Fault, TransportError
 
 
 WSDL = "http://127.0.0.1:8007/?wsdl"
+TNS = "serverroom.soap"  # ciljni imenski prostor storitve (glej server/app.py)
 
 
-def print_menu():
+def print_menu(session):
     print()
     print("=== Server Room SOAP Client ===")
+    if session["username"]:
+        print("  (prijavljen kot: " + session["username"] + ")")
     print("1) Prikaži stanja vseh naprav")
     print("2) Nastavi stanje naprave (ON/OFF)")
     print("3) Prikaži senzorje naprave")
     print("4) Prikaži meritve naprave")
+    print("5) Registriraj novega uporabnika")
+    print("6) Prijava (nastavi WSSE poverilnice)")
     print("0) Izhod")
 
 
-def op_states(service):
-    devices = service.get_device_states()
+def make_header(client, username, password):
+    security = client.get_element("{%s}Security" % TNS)
+    return security(
+        UsernameToken={
+            "Username": username,
+            "Password": {"Value": password},
+        }
+    )
+
+
+def require_login(session):
+    if session["header"] is None:
+        print("  Najprej se prijavi (izbira 6) — operacija zahteva WSSE security header.")
+        return False
+    return True
+
+
+def op_states(service, session):
+    if not require_login(session):
+        return
+    devices = service.get_device_states(_soapheaders=[session["header"]])
     print()
     for device in devices:
         print("  " + device["serial"] + "  " + device["name"] + "  stanje=" + str(device["state"]))
 
 
-def op_set_state(service):
+def op_set_state(service, session):
+    if not require_login(session):
+        return
     serial = input("  Serijska številka naprave: ").strip()
     state = input("  Novo stanje (ON/OFF): ").strip().upper()
-    service.set_device_state(serial, state)
+    service.set_device_state(serial, state, _soapheaders=[session["header"]])
     print("  OK: " + serial + " -> " + state)
 
 
-def op_sensors(service):
+def op_sensors(service, session):
+    if not require_login(session):
+        return
     serial = input("  Serijska številka naprave: ").strip()
-    sensors = service.get_sensors(serial)
+    sensors = service.get_sensors(serial, _soapheaders=[session["header"]])
     print()
     for sensor in sensors:
         print("    - " + sensor["serial"] + "  (" + sensor["name"] + ", enota=" + sensor["unit"] + ")")
 
 
-def op_readings(service):
+def op_readings(service, session):
+    if not require_login(session):
+        return
     serial = input("  Serijska številka naprave: ").strip()
-    readings = service.get_readings(serial)
+    readings = service.get_readings(serial, _soapheaders=[session["header"]])
     print()
     for reading in readings:
         print("    - " + reading["sensor_serial"] + " @ " + str(reading["timestamp"]) + " -> " + str(reading["value"]))
+
+
+def op_register(service, session):
+    username = input("  Uporabniško ime (min 3 znake): ").strip()
+    password = input("  Geslo (min 6 znakov): ").strip()
+    role = input("  Vloga (reader/writer): ").strip().lower()
+    result = service.register_user({"username": username, "password": password, "role": role})
+    print("  OK: " + result)
+
+
+def op_login(service, session):
+    username = input("  Uporabniško ime: ").strip()
+    password = input("  Geslo: ").strip()
+    session["header"] = make_header(session["client"], username, password)
+    session["username"] = username
+    print("  OK: prijavljen kot " + username + " (poverilnice se preverijo ob naslednjem klicu).")
 
 
 def main():
@@ -60,15 +106,19 @@ def main():
     service = client.service
     print("Povezano.")
 
+    session = {"client": client, "header": None, "username": None}
+
     handlers = {
         "1": op_states,
         "2": op_set_state,
         "3": op_sensors,
         "4": op_readings,
+        "5": op_register,
+        "6": op_login,
     }
 
     while True:
-        print_menu()
+        print_menu(session)
         try:
             choice = input("Izberi: ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -86,7 +136,7 @@ def main():
             continue
 
         try:
-            handler(service)
+            handler(service, session)
         except Fault as error:
             print("  SOAP napaka: " + str(error.message))
         except ValueError:
