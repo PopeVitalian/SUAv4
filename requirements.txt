@@ -1,0 +1,4 @@
+spyne==2.14.0
+lxml>=4.9
+zeep>=4.2
+requests>=2.28

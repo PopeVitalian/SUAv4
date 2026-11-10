@@ -1,0 +1,156 @@
+# Storitev Server Room SOAP
+
+Spletna storitev SOAP, ki upravlja tri simulirane naprave v strežniški
+sobi. Namenski konzolni odjemalec demonstrira vse operacije.
+
+Arhitektura ustreza vzorcu **storitveno podprta komunikacija**
+(angl. *service-assisted communication*): odjemalec nikoli ne
+komunicira z napravo neposredno. Kliče spletno storitev, storitev pa
+vrne podatke o napravi in izvede ukaze. Naprave in senzorji so
+simulirani v pomnilniku procesa storitve.
+
+## Arhitektura
+
+    client/client.py  --SOAP-->  server/service.py  -->  server/devices.py
+      (Zeep proxy)               (Spyne adapter)        (podatki v pomnilniku)
+
+- `server/devices.py` vsebuje podatke o napravah in logiko simulacije.
+  Ne uvaža Spyne, nima HTTP-ja in ne ve, da bo izpostavljen prek SOAP.
+- `server/service.py` je SOAP adapter. Bere slovarje iz `devices.py`
+  in jih ovije v modele Spyne. Tu ni poslovne logike.
+- `server/app.py` poveže storitev v WSGI aplikacijo.
+- `run_server.py` zažene strežnik na vratih 8007.
+- `client/client.py` je interaktivni konzolni odjemalec (Zeep).
+
+Ločevanje je pomembno: domenska plast ne ve, da je izpostavljena prek
+SOAP. Če bi kasneje prešli na REST ali gRPC, bi bilo treba spremeniti
+samo `service.py` in `app.py`.
+
+## Naprave in senzorji
+
+| Naprava                          | Serijska št.   | Proizvajalec |
+|----------------------------------|----------------|--------------|
+| NetShelter Rack PDU 2026         | PDU-2026-0001  | APC          |
+| EnvGuard Environmental Sensor    | ENV-2026-0001  | Sensirion    |
+| AxisEye RackCam 4K               | CAM-2026-0001  | Axis         |
+
+| Senzor                       | Naprava | Enota                  |
+|------------------------------|---------|------------------------|
+| PDU-2026-0001-current        | PDU     | A                      |
+| PDU-2026-0001-temp           | PDU     | C                      |
+| ENV-2026-0001-temperature    | ENV     | C                      |
+| ENV-2026-0001-door           | ENV     | enum (open/closed/fault) |
+| CAM-2026-0001-motion         | CAM     | bool (true/false)      |
+
+Skupaj: 3 naprave, 5 senzorjev. Vrednosti pokrivajo numerični, enum
+in boolean tip.
+
+## Operacije
+
+| Operacija                        | Namen                                          |
+|----------------------------------|------------------------------------------------|
+| `get_device_states()`            | Vrne vse naprave in njihovo stanje ON/OFF      |
+| `set_device_state(serial, st)`   | Nastavi napravo na ON ali OFF                  |
+| `get_sensors(serial)`            | Vrne senzorje ene naprave                      |
+| `get_readings(serial)`           | Vrne eno svežo meritev na senzor               |
+| `toggle_outlet(serial, index)`   | Preklopi eno vtičnico PDU (indeks 1..8)        |
+| `set_alarm_temp(serial, temp)`   | Nastavi alarmno temperaturo ENV (v C)          |
+| `goto_preset(serial, preset)`    | Premakne CAM na PTZ pozicijo                   |
+
+Naloga zahteva štiri kategorije: branje stanja, pisanje stanja,
+krmiljenje, seznam senzorjev. Branje stanja, pisanje stanja in seznam
+senzorjev se preslikajo 1:1. **Krmiljenje je razdeljeno na tri ločene
+tipizirane operacije**, namesto ene netipizirane
+`executeCommand(vrsta, argumenti)`. Razlog: vsako krmiljenje ima svoje
+naravne parametre (indeks vtičnice, temperaturo, ime pozicije), ločene
+operacije pa ohranijo WSDL ekspliciten in samoopisen. Zeep vsako
+izpostavi kot samostojno metodo.
+
+`get_readings` ni v štirih zahtevanih kategorijah, a naloga zahteva,
+da so vrednosti senzorjev del sporočil. Obstaja zato, da odjemalec
+lahko vidi dejansko vrednost.
+
+## Namestitev
+
+Zahteva Python 3.10 do 3.12.
+
+    pip install -r requirements.txt
+
+## Zagon
+
+Terminal 1:
+
+    python run_server.py
+
+Strežnik posluša na `http://127.0.0.1:8007`. WSDL je na
+`http://127.0.0.1:8007/?wsdl`.
+
+Terminal 2:
+
+    cd client
+    python client.py
+
+## Preizkus delovanja
+
+Odjemalec ponudi meni z naslednjimi možnostmi:
+
+1. Prikaži stanja vseh naprav — prikaže vse tri naprave in njihovo stanje.
+2. Nastavi stanje naprave — vpraša za serijsko številko in novo stanje
+   (ON/OFF). Primer: `PDU-2026-0001`, `OFF`.
+3. Prikaži senzorje naprave — seznam senzorjev za izbrano napravo.
+4. Prikaži meritve naprave — sveže meritve z časovnimi značkami UTC.
+5. Preklopi vtičnico PDU — primer: `PDU-2026-0001`, `3`.
+6. Nastavi alarmno temperaturo ENV — primer: `ENV-2026-0001`, `27.5`.
+7. Nastavi PTZ pozicijo CAM — primer: `CAM-2026-0001`, `door`.
+0. Izhod.
+
+Če pošljete neveljavne podatke (neobstoječa naprava, neveljavno
+stanje, napačna vrsta naprave za določeno krmiljenje), strežnik vrne
+SOAP napako, odjemalec pa jo izpiše. Primer:
+
+- `get_sensors("XX-0000")` → `SOAP napaka: unknown device: XX-0000`
+- `set_device_state("PDU-2026-0001", "BROKEN")` → `SOAP napaka: invalid state: BROKEN`
+- `goto_preset("PDU-2026-0001", "door")` → `SOAP napaka: PDU-2026-0001 has no PTZ presets`
+
+## Zasnova in odločitve (za zagovor)
+
+**Zakaj simulirane naprave?**
+Naloga dovoljuje simulirane podatke senzorjev. Naprave živijo v
+slovarju v pomnilniku procesa storitve in vztrajajo, dokler proces
+teče. Vrednosti meritev se ustvarijo na novo ob vsakem klicu, zato
+odjemalec vidi spremembe skozi čas.
+
+**Zakaj je vrednost senzorja shranjena kot niz?**
+Senzorji vračajo različne tipe (numerični, enum, boolean). Shranjevanje
+v niz ohrani en sam tip sporočila za vse meritve in se izogne
+polimorfnim SOAP shemam, kar bi bilo precejšnje dodatno delo brez
+koristi za oceno. Polje `unit` na senzorju pove odjemalcu, kako
+vrednost interpretirati.
+
+**Zakaj tri ločene operacije za krmiljenje?**
+Glej zgoraj. To je zavestna odločitev, ne spregled.
+
+**Kaj pa avtentikacija?**
+Ni implementirana. Naloga omenja "varen dostop" v kontekstu vmesnega
+sloja, ne zahteva pa avtentikacije. V produkciji bi storitev stala za
+avtentikacijskim prehodom (mTLS, API ključ ali OAuth proxy). Vezava
+na `127.0.0.1` je razvojna privzetska vrednost — nikoli je ne
+izpostavite javnemu omrežju takšne, kot je.
+
+**Kaj potem pomeni "varen dostop" brez avtentikacije?**
+Da se odjemalec nikoli ne dotakne naprav neposredno. Ves dostop gre
+skozi storitveni sloj, ki preveri vhod in ob neveljavnih zahtevah
+sproži SOAP napako. To je šiv, kamor bi dodali avtentikacijo.
+
+**Časovne značke in enote.**
+Vse časovne značke se ustvarijo z `datetime.now(timezone.utc)` —
+časovno občutljive, na žici v ISO 8601. Pomembno zato, ker naloga
+omenja globalno občinstvo. Enote so shranjene kot nizi (`C`, `A`,
+`enum`, `bool`), kar omogoča, da odjemalec sam pretvori v °F ali
+drugo enoto, če je treba. Pretvorba ni implementirana.
+
+**Odjemalec ni WCF Test Client.**
+Odjemalec ni WCF Test Client ali podobno generično orodje. Je namenski
+interaktivni konzolni odjemalec (`client/client.py`), ki demonstrira
+točno tiste operacije, ki jih naloga zahteva, s slovenskim menijem in
+obravnavo napak na dveh ravneh.
